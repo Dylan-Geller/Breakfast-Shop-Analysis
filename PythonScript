@@ -1,0 +1,238 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+#Importing csv file
+breakfast = pd.read_csv('/content/Breakfast.csv')
+
+#Reformatting columns to be lowercase and have underscore instead of spaces
+breakfast.columns = [col.lower().replace(' ', '_') for col in breakfast.columns]
+breakfast.rename(columns=lambda x: x.replace("(", "").replace(")", ""), inplace=True)
+
+#Reformatting date column and setting it as the index for filtering purposes
+breakfast['date'] = pd.to_datetime(breakfast['date'])
+breakfast = breakfast.set_index('date')
+
+#Groupby to create new dataframe grouped by date and dish name
+dish_by_date = breakfast.groupby(['date','dish_name']).agg({'dine_in':'sum','parcel':'sum','total_customers':'sum'}).reset_index()
+print(dish_by_date)
+
+#Using the melt method to unpivot the customer type columns
+dish_melt = dish_by_date.melt(id_vars= ['date','dish_name'],value_vars=['dine_in','parcel'],var_name = 'customer_type',value_name='customer_count')
+print(dish_melt)
+#Another groupby to create dataframe grouped by date, dish_name and customer_type (dine-in or parcel) and show the counts of each customer type
+dish_by_type = dish_melt.groupby(['date','dish_name','customer_type']).agg({'customer_count':'sum'}).reset_index()
+
+#Querying for each dish name
+aloo = dish_by_type.query("dish_name == 'aloo paratha'")
+eggs = dish_by_type.query("dish_name == 'boiled eggs'")
+bread = dish_by_type.query("dish_name == 'bread pakoda'")
+idli = dish_by_type.query("dish_name == 'idli'")
+samosa = dish_by_type.query("dish_name == 'samosa'")
+tarri = dish_by_type.query("dish_name == 'tarri poha'")
+
+#groupby to create dataframe of sum of total sales and customers grouped by date and dish name
+total_sales = breakfast.groupby(['date','dish_name']).agg({'total_customers':'sum','total_sales':'sum'}).reset_index()
+#setting the date column as the index for filtering purposes
+total_sales = total_sales.set_index('date')
+
+#Creating 2 new dataframes fitlered by month
+sales_oct = total_sales.loc['2023-10-01':'2023-10-31'].reset_index()
+sales_nov = total_sales.loc['2023-11-01':'2023-11-30'].reset_index()
+
+#reformatting date columns to give just the day number instead of full date
+sales_oct['date'] = sales_oct['date'].dt.day
+sales_nov['date'] = sales_nov['date'].dt.day
+
+#setting figure size
+fig = plt.figure(figsize=(15,10))
+
+#Barplots showing total sales of each dish by day of the month for both months
+plt.subplot(2,1,1)
+sns.barplot(data=sales_oct,x='date',y='total_sales',hue='dish_name')
+plt.title('Total Daily Revenue by Dish Name - Oct 2023')
+plt.xlabel('')
+plt.ylabel('Revenue')
+plt.legend(title='Dish Name',bbox_to_anchor=(1.10, 1), loc='upper right', borderaxespad=0)
+
+plt.subplot(2,1,2)
+sns.barplot(data=sales_nov,x='date',y='total_sales',hue='dish_name')
+plt.title('Total Daily Revenue by Dish Name - Nov 2023')
+plt.xlabel('Day of the Month')
+plt.ylabel('Revenue')
+#removing legend from second bar plot
+plt.legend('',frameon=False)
+
+#displaying barplots
+plt.show()
+
+#setting date column as in the index for filtering purposes
+aloo = aloo.set_index('date')
+
+#Creating new dataframes filtered by month
+aloo_oct = aloo.loc['2023-10-01':'2023-10-31'].reset_index()
+aloo_nov = aloo.loc['2023-11-01':'2023-11-30'].reset_index()
+
+#reformatting dates to be days of the week instead of the full date
+aloo_oct['date'] = aloo_oct['date'].dt.dayofweek
+aloo_nov['date'] = aloo_nov['date'].dt.dayofweek
+
+#groupby to display the mean customer count by customer type and date
+aloo_oct = aloo_oct.groupby(['date','dish_name','customer_type']).agg({'customer_count':'mean'}).reset_index()
+aloo_nov = aloo_nov.groupby(['date','dish_name','customer_type']).agg({'customer_count':'mean'}).reset_index()
+
+#Chaning the days of the weeks to strings
+aloo_oct['date'] = aloo_oct['date'].apply(lambda i: 'Mon' if i == 0 else 'Tues' if i == 1
+                                 else 'Wed' if i == 2 else 'Thur' if i == 3
+                                 else 'Fri' if i == 4 else 'Sat' if i == 5 else 'Sun')
+
+aloo_nov['date'] = aloo_nov['date'].apply(lambda i: 'Mon' if i == 0 else 'Tues' if i == 1
+                                 else 'Wed' if i == 2 else 'Thur' if i == 3
+                                 else 'Fri' if i == 4 else 'Sat' if i == 5 else 'Sun')
+
+#function to display values over the bars in barplots
+def show_values(axs, orient="v", space=.01):
+    def _single(ax):
+        if orient == "v":
+            for p in ax.patches:
+                _x = p.get_x() + p.get_width() / 2
+                _y = p.get_y() + p.get_height() + (p.get_height()*0.01)
+                value = '{:.1f}'.format(p.get_height())
+                ax.text(_x, _y, value, ha="center")
+        elif orient == "h":
+            for p in ax.patches:
+                _x = p.get_x() + p.get_width() + float(space)
+                _y = p.get_y() + p.get_height() - (p.get_height()*0.5)
+                value = '{:.1f}'.format(p.get_width())
+                ax.text(_x, _y, value, ha="left")
+
+    if isinstance(axs, np.ndarray):
+        for idx, ax in np.ndenumerate(axs):
+            _single(ax)
+    else:
+        _single(axs)
+
+#setting the figure size
+fig = plt.figure(figsize=(12,8))
+
+#setting the figure style
+sns.set_style('darkgrid')
+
+#barplots to display the mean order of aloo dish by customer type and day of the week for October
+plt.subplot(2,1,1)
+plot1 = sns.barplot(data=aloo_oct,x='date',y='customer_count',hue='customer_type')
+plt.title('Aloo Paratha Mean Daily Orders - Oct 2023')
+plt.xlabel('')
+plt.ylabel('Number of Customers')
+#calling function to display bar values
+show_values(plot1)
+
+#barplot displaying same information but for November
+plt.subplot(2,1,2)
+plot2 = sns.barplot(data=aloo_nov,x='date',y='customer_count',hue='customer_type')
+plt.title('Aloo Paratha Mean Daily Orders - Nov 2023')
+plt.xlabel('Day of the Month')
+plt.ylabel('Number of Customers')
+plt.legend('',frameon=False)
+show_values(plot2)
+
+#displaying the bar plots
+plt.show()
+
+#creating variable for today's date
+today_date = '2023-10-31'
+
+#google sheet name to write data to
+sheet_name = '31'
+
+
+#filtering today's orders by today's date
+today_orders = breakfast.loc[today_date:today_date].reset_index()
+
+#groupby statement to make new df grouped by dish name
+grouped = today_orders.groupby('dish_name')['total_customers','dine_in','parcel','total_sales'].sum().reset_index()
+
+#changing all values in df to strings
+grouped['dish_name'] = grouped['dish_name'].str.title()
+grouped['total_customers'] = grouped['total_customers'].astype(str)
+grouped['dine_in'] = grouped['dine_in'].astype(str)
+grouped['parcel'] = grouped['parcel'].astype(str)
+grouped['total_sales'] = grouped['total_sales'].astype(str)
+
+print(grouped)
+#getting authorization to interact with the Google Sheet
+from google.colab import auth
+auth.authenticate_user()
+import gspread
+from google.auth import default
+creds, _ = default()
+
+#ACCESSING GOOGLE SHEET
+gc = gspread.authorize(creds)
+
+wb = gc.open('Daily Customer Orders - October 2023')
+ws = wb.worksheet(sheet_name)
+
+#REMOVING COLUMN HEADERS
+grouped.columns = grouped.iloc[0,:].values
+grouped = grouped.tail(-1)
+
+#UPDATING GOOGLE SHEET
+l_of_lists = grouped.to_numpy().tolist()
+headers = grouped.columns.to_list()
+dataToWrite = [headers] + l_of_lists
+
+ws.update('B4:F', dataToWrite)
+
+#Creating new df grouped by dish name and date
+grouped = breakfast.groupby(['dish_name','date'])['total_customers','dine_in','parcel','total_sales'].sum().reset_index()
+
+#creating a new df from previous one with a rolling average column
+sma = round(grouped.rolling(3,on='dish_name',axis=0,min_periods=0).mean(),2)
+sma['date'] = grouped['date'] #adding a date column
+sma = sma.set_index('date') #setting the date column as the index for filtering purposes
+print('--------------------------')
+print(sma.head())
+print('--------------------------')
+#Creating new dataframes filtered by month
+sma_oct = sma.loc['2023-10-01':'2023-10-31'].reset_index()
+sma_nov = sma.loc['2023-11-01':'2023-11-30'].reset_index()
+
+#reformatting dates to be days of the week instead of the full date
+sma_oct['date'] = sma_oct['date'].dt.day
+sma_nov['date'] = sma_nov['date'].dt.day
+
+#filtering for the aloo parahta dish
+sma_aloo_oct = sma_oct[sma_oct['dish_name'] == 'aloo paratha']
+sma_aloo_nov = sma_nov[sma_nov['dish_name'] == 'aloo paratha']
+
+#SMA FOR EVERY DISH OCT
+sns.set_style('darkgrid')
+sns.relplot(kind='line',data=sma_oct, x='date',y='dine_in',markers=True,ci=None,hue='dish_name',style='dish_name')
+plt.title('Moving Average of Dish Sales October 2023')
+plt.xlabel('Day of the Month')
+plt.ylabel('Average Sales')
+
+#SMA FOR EVERY DISH NOV
+print(sma_oct.head())
+sns.set_style('darkgrid')
+sns.relplot(kind='line',data=sma_nov, x='date',y='dine_in',markers=True,ci=None,hue='dish_name',style='dish_name')
+plt.title('Moving Average of Dish Sales November 2023')
+plt.xlabel('Day of the Month')
+plt.ylabel('Average Sales')
+
+#ALOO PARATHA SMA OCT
+sns.set_style('darkgrid')
+sns.relplot(kind='line',data=sma_aloo_oct, x='date',y='dine_in',marker="o",ci=None)
+plt.title('Moving Average of Aloo Paratha Sales October 2023')
+plt.xlabel('Day of the Month')
+plt.ylabel('Average Sales')
+
+#ALOO PARATHA SMA NOV
+print(sma_oct.head())
+sns.set_style('darkgrid')
+sns.relplot(kind='line',data=sma_aloo_nov, x='date',y='dine_in',marker="o",ci=None)
+plt.title('Moving Average of Aloo Paratha Sales November 2023')
+plt.xlabel('Day of the Month')
+plt.ylabel('Average Sales')
